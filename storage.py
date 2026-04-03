@@ -34,9 +34,9 @@ class Admins:
     @staticmethod
     def get_from_username(username):
         admins = Admins.load()
-        for admin in admins.values():
+        for uid, admin in admins.items():
             if admin["username"] == username:
-                return admin
+                return {"id": uid, "username": admin["username"]}
         return None
 
     @staticmethod
@@ -88,7 +88,7 @@ class Users:
             json.dump(users, f, indent=4)
 
     @staticmethod
-    def add(id, username, skill_level):
+    def add(id, username, skill_level, minecraft_username):
         users = Users.load()
         try:
             skill_level = int(skill_level)
@@ -96,7 +96,7 @@ class Users:
             return False,"Skill level must be an integer"
         if skill_level < 0 or skill_level > 5:
             return False,"Skill level must be between 0 and 5"
-        users[str(id)] = {"username": username, "skill_level": skill_level}
+        users[str(id)] = {"username": username, "skill_level": skill_level, "minecraft_username": minecraft_username}
         Users.save(users)
         return True, "User added successfully"
 
@@ -114,6 +114,15 @@ class Users:
         return None
 
     @staticmethod
+    def get_from_minecraft_username(minecraft_username: str):
+        users = Users.load()
+        for uid, user in users.items():
+            if user["minecraft_username"] == minecraft_username:
+                return {"id": uid, "username": user["username"], "skill_level": user["skill_level"], "minecraft_username": user["minecraft_username"]}
+        return None
+
+
+    @staticmethod
     def delete(id : int):
         users = Users.load()
         uid = str(id)
@@ -124,7 +133,7 @@ class Users:
         return False, "User not found"
 
     @staticmethod
-    def update(id : int, username: str | None, skill_level: int | str | None):
+    def update(id : int, username: str | None, skill_level: int | str | None, minecraft_username: str | None):
         users = Users.load()
         uid = str(id)
         if uid not in users:
@@ -139,6 +148,8 @@ class Users:
             if skill_level < 0 or skill_level > 5:
                 return False, "Skill level must be between 0 and 5"
             users[uid]["skill_level"] = skill_level
+        if minecraft_username is not None:
+            users[uid]["minecraft_username"] = minecraft_username
         Users.save(users)
         return True, "User updated successfully"
 
@@ -228,76 +239,3 @@ class Challenges:
     def delete_data():
         with open(Challenges.FILE, "w") as f:
             f.write("")
-
-if __name__ == "__main__":
-    if __name__ == "__main__":
-        print("=== USERS TESTS ===")
-
-        # Add users
-        print("\nAdding user 1 with invalid skill 10")
-        success, msg = Users.add(1, "Alice", 10)
-        print(success, msg)
-
-        print("\nAdding user 1 with valid skill 3")
-        success, msg = Users.add(1, "Alice", 3)
-        print(success, msg)
-
-        print("\nAdding user 2 with valid skill 4")
-        success, msg = Users.add(2, "Bob", 4)
-        print(success, msg)
-
-        # Get users
-        print("\nGetting user 1")
-        print(Users.get(1))
-
-        # Update users
-        print("\nUpdating user 1 with invalid skill 20")
-        success, msg = Users.update(1, skill_level=20, username=None)
-        print(success, msg)
-
-        print("\nUpdating user 1 with valid skill 5 and new username 'AliceUpdated'")
-        success, msg = Users.update(1, skill_level=5, username="AliceUpdated")
-        print(success, msg)
-
-        print("\nGetting updated user 1")
-        print(Users.get(1))
-
-        # Delete user
-        print("\nDeleting user 1")
-        success, msg = Users.delete(1)
-        print(success, msg)
-
-        print("\nTrying to get deleted user 1")
-        print(Users.get(1))
-
-
-        print("\n=== CHALLENGES TESTS ===")
-
-        # Add challenges
-        print("\nAdding challenge 1")
-        success, msg = Challenges.add(1, "Jump over lava")
-        print(success, msg)
-
-        print("\nAdding challenge 2")
-        success, msg = Challenges.add(3, "Build a castle")
-        print(success, msg)
-
-        # List all challenges
-        print("\nListing all challenges")
-        print(Challenges.load())
-
-        # Update challenge
-        print("\nUpdating challenge 1 difficulty to 2 and text to 'Cross the lava pit'")
-        success, msg = Challenges.update(1, difficulty=2, text="Cross the lava pit")
-        print(success, msg)
-
-        print("\nGetting updated challenge 1")
-        print(Challenges.get(1))
-
-        # Delete challenge
-        print("\nDeleting challenge 2")
-        success, msg = Challenges.delete(2)
-        print(success, msg)
-
-        print("\nListing all challenges after deletion")
-        print(Challenges.load())

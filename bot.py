@@ -60,15 +60,21 @@ async def me(interaction: discord.Interaction):
         await interaction.response.send_message("You are not registered yet!")
         log.info(f"{interaction.user} is not registered yet!")
     else:
-        await interaction.response.send_message(f"Username: {user['username']}, Skill Level: {user['skill_level']}")
+        embed = discord.Embed(title="User Information", color=0x00ff00)
+        embed.add_field(name="Username", value=user['username'], inline=False)
+        embed.add_field(name="Skill Level", value=user['skill_level'], inline=False)
+        embed.add_field(name="Minecraft Username", value=user['minecraft_username'], inline=False)
+        skin_url = f"https://mc-heads.net/body/{user['minecraft_username']}/128"
+        embed.set_thumbnail(url=skin_url)
+        await interaction.response.send_message(embed=embed)
         log.info(f"{interaction.user} requested their user information")
 
 @bot.tree.command(name="sign", description="Sign up for the minecraft week")
-@app_commands.describe(skill_level = "Skill level 1-5")
-async def sign(interaction: discord.Interaction, skill_level : int):
+@app_commands.describe(skill_level = "Skill level 1-5", minecraft_username = "Your Minecraft username")
+async def sign(interaction: discord.Interaction, skill_level : int, minecraft_username : str):
     user = Users.get(interaction.user.id)
     if user is None:
-        success, message = Users.add(interaction.user.id, interaction.user.name, skill_level)
+        success, message = Users.add(interaction.user.id, interaction.user.name, skill_level, minecraft_username)
         if success:
             await interaction.response.send_message(f"Welcome to the Minecraft Week, {interaction.user.name}!")
             log.info(f"{interaction.user} signed up for the Minecraft Week")
@@ -87,10 +93,26 @@ async def changeskill(interaction: discord.Interaction, skill_level : int):
         await interaction.response.send_message("You are not registered!")
         log.info(f"{interaction.user} tried to change skill level but is not registered")
     else:
-        success, message = Users.update(interaction.user.id, None, skill_level)
+        success, message = Users.update(interaction.user.id, None, skill_level, None)
         if success:
             await interaction.response.send_message(f"Skill level updated to {skill_level}")
             log.info(f"{interaction.user} changed skill level to {skill_level}")
+        else:
+            await interaction.response.send_message(f"Failed to update skill level: {message}")
+            log.error(f"{interaction.user} failed to update their skill level: {message}")
+
+@bot.tree.command(name="changeminecraftusername", description="Change your Minecraft username")
+@app_commands.describe(minecraft_username = "Minecraft username")
+async def changeminecraftusername(interaction: discord.Interaction, minecraft_username : str):
+    user = Users.get(interaction.user.id)
+    if user is None:
+        await interaction.response.send_message("You are not registered!")
+        log.info(f"{interaction.user} tried to change skill level but is not registered")
+    else:
+        success, message = Users.update(interaction.user.id, None, None, minecraft_username)
+        if success:
+            await interaction.response.send_message(f"Minecraft username updated to {minecraft_username}")
+            log.info(f"{interaction.user} changed Minecraft username to {minecraft_username}")
         else:
             await interaction.response.send_message(f"Failed to update skill level: {message}")
             log.error(f"{interaction.user} failed to update their skill level: {message}")
@@ -100,16 +122,16 @@ Admin Commands
 """
 
 @bot.tree.command(name="adduser", description="(Admins only) Add user.")
-@app_commands.describe(mention = "Discord user to add", skill_level = "Skill level 1-5")
-async def adduser(interaction: discord.Interaction, mention: discord.Member, skill_level : int):
+@app_commands.describe(mention = "Discord user to add", skill_level = "Skill level 1-5", minecraft_username = "Minecraft username")
+async def adduser(interaction: discord.Interaction, mention: discord.Member, skill_level : int, minecraft_username : str):
     if not (is_admin(interaction.user.id) or is_owner(interaction.user.id)):
         await interaction.response.send_message("You are not an admin/owner!")
         log.info(f"{interaction.user} tried to add a user but is not an admin/owner")
         return
-    success, message = Users.add(mention.id, mention.name, skill_level)
+    success, message = Users.add(mention.id, mention.name, skill_level, minecraft_username)
     if success:
-        await interaction.response.send_message(f"User {mention.name} with skill level {skill_level} added successfully!")
-        log.info(f"{interaction.user} added user {mention.name} with skill level {skill_level}")
+        await interaction.response.send_message(f"User {mention.name} with skill level {skill_level} and minecraft username {minecraft_username} added successfully!")
+        log.info(f"{interaction.user} added user {mention.name} with skill level {skill_level} and minecraft username {minecraft_username}")
     else:
         await interaction.response.send_message(f"Failed to add user: {message}")
         log.info(f"{interaction.user} failed to add user {mention.name}: {message}")
@@ -161,11 +183,11 @@ async def addadmin(interaction: discord.Interaction, mention : discord.Member):
         return
     success, message = Admins.add(mention.id, mention.name)
     if success:
-        await interaction.response.send_message(f"Admin {mention.name} added successfully to the admin list!")
+        await interaction.response.send_message(f"{mention.mention} added successfully to the admin list!")
         log.info(f"{interaction.user} added admin {mention.name} to the admin list")
     else:
-        await interaction.response.send_message(f"Failed to add admin: {message} to the admin list!")
-        log.info(f"{interaction.user} failed to add admin {mention.name} to the admin list! {message}")
+        await interaction.response.send_message(f"Failed to add admin: {message}")
+        log.info(f"{interaction.user} failed to add {mention.name} to the admin list! {message}")
 
 @bot.tree.command(name="deleteadmin", description="(Owner only) Delete admin.")
 @app_commands.describe(mention = "Discord username of the admin to delete")
@@ -174,7 +196,7 @@ async def deleteadmin(interaction: discord.Interaction, mention: discord.Member)
         await interaction.response.send_message("You are not the owner!")
         log.info(f"{interaction.user} tried to delete a user but is not the owner")
         return
-    admin = Admins.get_from_username(mention.id)
+    admin = Admins.get_from_username(mention.name)
     if admin is None:
         await interaction.response.send_message(f"User {mention.name} not found in the admin list!")
         log.info(f"{interaction.user} tried to delete user {mention.name} from the admin list but it was not found")
@@ -198,7 +220,7 @@ async def listadmins(interaction: discord.Interaction):
         await interaction.response.send_message("No admins found!")
         log.info(f"{interaction.user} listed no admins")
     else:
-        await interaction.response.send_message(f"Users:\n{', '.join([f'{admin['username']} ({admin['skill_level']})' for admin in admins])}")
+        await interaction.response.send_message(f"Users:\n{', '.join([f'{admin['username']}' for admin in admins])}")
         log.info(f"{interaction.user} listed users")
 
 @bot.tree.command(name="wipeusers", description="(Owner only) Wipe all user data.")
